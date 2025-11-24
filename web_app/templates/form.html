@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ title }}</h1>
+    <a href="{{ url_for(back_url) }}" class="btn btn-secondary">← Назад</a>
+</div>
+
+<div class="form-container">
+    <form method="POST" class="form">
+        {% for field in fields %}
+        <div class="form-group">
+            <label for="{{ field.name }}">
+                {{ field.label }} 
+                {% if field.required %}<span class="required">*</span>{% endif %}
+            </label>
+            
+            {% if field.type == 'text' %}
+            <input type="text" id="{{ field.name }}" name="{{ field.name }}" 
+                   {% if field.required %}required{% endif %}
+                   value="{{ field.value if field.value else '' }}"
+                   placeholder="{{ field.placeholder if field.placeholder else '' }}">
+            
+            {% elif field.type == 'number' %}
+            <input type="number" id="{{ field.name }}" name="{{ field.name }}" 
+                   {% if field.required %}required{% endif %}
+                   value="{{ field.value if field.value else '' }}"
+                   step="{{ field.step if field.step else '1' }}"
+                   min="{{ field.min if field.min else '0' }}">
+            
+            {% elif field.type == 'select' %}
+            <select id="{{ field.name }}" name="{{ field.name }}" {% if field.required %}required{% endif %}>
+                <option value="">Оберіть...</option>
+                {% for option in field.options %}
+                <option value="{{ option.value }}" 
+                        {% if field.value and option.value == field.value %}selected{% endif %}>
+                    {{ option.label }}
+                </option>
+                {% endfor %}
+            </select>
+            
+            {% elif field.type == 'textarea' %}
+            <textarea id="{{ field.name }}" name="{{ field.name }}" rows="4"
+                      {% if field.required %}required{% endif %}>{{ field.value if field.value else '' }}</textarea>
+            {% endif %}
+        </div>
+        {% endfor %}
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">💾 Зберегти</button>
+            <a href="{{ url_for(back_url) }}" class="btn btn-secondary">Скасувати</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

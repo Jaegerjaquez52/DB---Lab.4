@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block title %}Головна{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📊 Панель управління</h1>
+</div>
+
+{% if stats %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">👥</div>
+        <div class="stat-content">
+            <h3>{{ stats.total_customers }}</h3>
+            <p>Клієнтів</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">👔</div>
+        <div class="stat-content">
+            <h3>{{ stats.total_employees }}</h3>
+            <p>Працівників</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">📋</div>
+        <div class="stat-content">
+            <h3>{{ stats.total_menu_items }}</h3>
+            <p>Страв у меню</p>
+        </div>
+    </div>
+    
+    <div class="stat-card">
+        <div class="stat-icon">📝</div>
+        <div class="stat-content">
+            <h3>{{ stats.total_orders }}</h3>
+            <p>Всього замовлень</p>
+        </div>
+    </div>
+    
+    <div class="stat-card highlight">
+        <div class="stat-icon">🔥</div>
+        <div class="stat-content">
+            <h3>{{ stats.active_orders }}</h3>
+            <p>Активних замовлень</p>
+        </div>
+    </div>
+    
+    <div class="stat-card success">
+        <div class="stat-icon">💰</div>
+        <div class="stat-content">
+            <h3>{{ "%.2f"|format(stats.total_revenue) }} грн</h3>
+            <p>Загальна виручка</p>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="section">
+    <div class="section-header">
+        <h2>📝 Останні замовлення</h2>
+        <a href="{{ url_for('orders_list') }}" class="btn btn-secondary">Всі замовлення</a>
+    </div>
+    
+    {% if recent_orders %}
+    <div class="table-responsive">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Час</th>
+                    <th>Клієнт</th>
+                    <th>Офіціант</th>
+                    <th>Стіл</th>
+                    <th>Статус</th>
+                    <th>Сума</th>
+                    <th>Дії</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for order in recent_orders %}
+                <tr>
+                    <td>{{ order.order_id }}</td>
+                    <td>{{ order.order_time.strftime('%d.%m.%Y %H:%M') }}</td>
+                    <td>{{ order.customer_name }}</td>
+                    <td>{{ order.employee_name }}</td>
+                    <td>№{{ order.table_id }} ({{ order.table_location }})</td>
+                    <td><span class="badge badge-{{ order.order_status|lower }}">{{ order.order_status }}</span></td>
+                    <td>{{ "%.2f"|format(order.total_amount) }} грн</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <p class="empty-state">Замовлень поки немає</p>
+    {% endif %}
+</div>
+
+<div class="quick-actions">
+    <h2>⚡ Швидкі дії</h2>
+    <div class="actions-grid">
+        <a href="{{ url_for('orders_add') }}" class="action-card">
+            <span class="action-icon">➕</span>
+            <h3>Нове замовлення</h3>
+        </a>
+        <a href="{{ url_for('menu_add') }}" class="action-card">
+            <span class="action-icon">🍽️</span>
+            <h3>Додати страву</h3>
+        </a>
+        <a href="{{ url_for('customers_add') }}" class="action-card">
+            <span class="action-icon">👤</span>
+            <h3>Новий клієнт</h3>
+        </a>
+        <a href="{{ url_for('statistics') }}" class="action-card">
+            <span class="action-icon">📈</span>
+            <h3>Переглянути звіти</h3>
+        </a>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Статистика{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>📈 Статистика та звіти</h1>
+</div>
+
+<div class="section">
+    <h2>🔥 Топ-10 популярних страв</h2>
+    {% if popular_dishes %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Страва</th>
+                <th>Категорія</th>
+                <th>Замовлено разів</th>
+                <th>Виручка</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for dish in popular_dishes %}
+            <tr>
+                <td>{{ dish.menu_item_name }}</td>
+                <td>{{ dish.category }}</td>
+                <td>{{ dish.times_ordered }}</td>
+                <td>{{ "%.2f"|format(dish.total_revenue) }} грн</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+
+<div class="section">
+    <h2>👔 Статистика працівників</h2>
+    {% if employee_stats %}
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>Працівник</th>
+                <th>Посада</th>
+                <th>Замовлень</th>
+                <th>Виручка</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for emp in employee_stats %}
+            <tr>
+                <td>{{ emp.employee_name }}</td>
+                <td>{{ emp.position }}</td>
+                <td>{{ emp.total_orders }}</td>
+                <td>{{ "%.2f"|format(emp.total_revenue) }} грн</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% endif %}
+</div>
+{% endblock %}

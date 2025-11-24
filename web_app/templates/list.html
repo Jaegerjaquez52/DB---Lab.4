@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ title }}</h1>
+    {% if add_url %}
+    <a href="{{ url_for(add_url) }}" class="btn btn-primary">➕ Додати</a>
+    {% endif %}
+</div>
+
+{% if items %}
+<div class="table-responsive">
+    <table class="data-table">
+        <thead>
+            <tr>
+                {% for col in columns %}
+                <th>{{ col }}</th>
+                {% endfor %}
+                {% if edit_url or delete_url or details_url %}
+                <th>Дії</th>
+                {% endif %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                {% for field in fields %}
+                <td>
+                    {% if field == 'price' or field == 'total_amount' or field == 'avg_order_value' or field == 'total_revenue' %}
+                        {{ "%.2f"|format(item[field]) }} грн
+                    {% elif field == 'order_status' %}
+                        <span class="badge badge-{{ item[field]|lower }}">{{ item[field] }}</span>
+                    {% elif field == 'order_time' or field == 'created_at' or field == 'hire_date' %}
+                        {{ item[field].strftime('%d.%m.%Y %H:%M') if item[field] else '-' }}
+                    {% else %}
+                        {{ item[field] }}
+                    {% endif %}
+                </td>
+                {% endfor %}
+                
+                {% if edit_url or delete_url or details_url %}
+                <td class="actions">
+                    {% if details_url %}
+                    <a href="{{ url_for(details_url, **{id_param: item[id_field]}) }}" 
+                       class="btn btn-small btn-info">👁️</a>
+                    {% endif %}
+                    
+                    {% if edit_url %}
+                    <a href="{{ url_for(edit_url, **{id_param: item[id_field]}) }}" 
+                       class="btn btn-small btn-edit">✏️</a>
+                    {% endif %}
+                    
+                    {% if delete_url %}
+                    <a href="{{ url_for(delete_url, **{id_param: item[id_field]}) }}" 
+                       class="btn btn-small btn-delete"
+                       onclick="return confirm('Підтвердіть видалення')">🗑️</a>
+                    {% endif %}
+                </td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+<p class="table-info">Всього записів: {{ items|length }}</p>
+{% else %}
+<div class="empty-state">
+    <p>Даних поки немає</p>
+    {% if add_url %}
+    <a href="{{ url_for(add_url) }}" class="btn btn-primary">Додати перший запис</a>
+    {% endif %}
+</div>
+{% endif %}
+{% endblock %}
