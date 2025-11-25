@@ -1,5 +1,6 @@
 from flask import Flask, render_template, request, redirect, url_for, flash
 from database import DatabaseConnection
+import re
 
 # Ініціалізація Flask додатку
 app = Flask(__name__)
@@ -16,6 +17,40 @@ db = DatabaseConnection(
     port=5432
 )
 db.connect()
+
+# ============================================================
+# Валідація
+# ============================================================
+def validate_name(name):
+    """Перевіряє, чи ім'я містить лише літери (кирилиця/латиниця), пробіли, апострофи та дефіси. Не дозволяє цифри."""
+    # Дозволяємо кирилицю (\u0400-\u04FF), латиницю (a-zA-Z), пробіли (\s), дефіси (-) та апострофи (')
+    if not re.match(r"^[a-zA-Z\s\u0400-\u04FF'-]+$", name):
+        return False
+    # Перевірка на мінімальну довжину і відсутність лише пробілів
+    return len(name.strip()) > 0
+
+def validate_phone(phone):
+    """Перевіряє телефон: дозволяє форматування, але вимагає мінімум 7 цифр."""
+    
+    # 1. Перевірка на сторонні символи (заборона літер, спецсимволів крім дозволених)
+    # Дозволені: цифри, пробіли, дефіси, дужки та знак +
+    if not re.match(r"^[\d\s\-\(\)\+]+$", phone):
+        return False
+        
+    # 2. Перевірка мінімальної кількості цифр
+    # Видаляємо всі символи, крім цифр, і рахуємо їх
+    digits_only = re.sub(r'[^\d]', '', phone)
+    
+    # Вимагаємо мінімум 7 цифр
+    if len(digits_only) < 7:
+        return False
+        
+    return True
+
+def validate_email(email):
+    """Базова перевірка email: перевіряє основний формат user@domain.tld."""
+    # Спрощений regex для перевірки базової структури email
+    return re.match(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$", email)
 
 # ============================================================
 # ГОЛОВНА СТОРІНКА
@@ -44,7 +79,7 @@ def index():
         recent_orders_query = """
             SELECT * FROM view_orders_full 
             ORDER BY order_time DESC 
-            LIMIT 5
+            LIMIT 10
         """
         recent_orders = db.execute_query(recent_orders_query)
         
@@ -60,102 +95,125 @@ def index():
 
 @app.route('/menu')
 def menu_list():
-    menu_items = db.execute_query("""
-        SELECT menu_item_id, menu_item_name, category, price
-        FROM menu_items ORDER BY category, menu_item_name
-    """)
+    """Список страв у меню."""
+    query = """
+        SELECT mi.*, mc.category_name 
+        FROM menu_items mi 
+        JOIN menu_categories mc ON mi.category_id = mc.category_id
+    """
+    items = db.execute_query(query)
     
-    return render_template('list.html',
-        title='📋 Меню ресторану',
-        items=menu_items,
-        columns=['ID', 'Назва', 'Категорія', 'Ціна'],
-        fields=['menu_item_id', 'menu_item_name', 'category', 'price'],
-        id_field='menu_item_id',
-        id_param='menu_item_id',
+    return render_template(
+        'list.html',
+        title='🍽️ Меню',
+        items=items,
+        columns=['ID', 'Назва', 'Категорія', 'Опис', 'Ціна'],
+        fields=['menu_item_id', 'menu_item_name', 'category', 'menu_item_description', 'price'],
         add_url='menu_add',
         edit_url='menu_edit',
-        delete_url='menu_delete'
+        delete_url='menu_delete',
+        id_field='menu_item_id',
+        id_param='menu_item_id'
     )
 
 @app.route('/menu/add', methods=['GET', 'POST'])
 def menu_add():
-    if request.method == 'POST':
-        try:
-            name = request.form['name']
-            category = request.form['category']
-            description = request.form['description']
-            price = float(request.form['price'])
-            
-            query = """
-                INSERT INTO menu_items (menu_item_name, category, menu_item_description, price)
-                VALUES (%s, %s, %s, %s)
-            """
-            db.execute_query(query, (name, category, description, price), fetch=False)
-            flash(f'Страву "{name}" додано!', 'success')
-            return redirect(url_for('menu_list'))
-        except Exception as e:
-            flash(f'Помилка: {str(e)}', 'error')
+    """Додавання нової страви."""
     
-    fields = [
-        {'name': 'name', 'label': 'Назва страви', 'type': 'text', 'required': True},
-        {'name': 'category', 'label': 'Категорія', 'type': 'select', 'required': True,
-         'options': [{'value': c, 'label': c} for c in ['Супи', 'Салати', 'Гарячі страви', 'Паста', 'Десерти', 'Напої', 'Алкоголь']]},
-        {'name': 'description', 'label': 'Опис', 'type': 'textarea', 'required': False},
-        {'name': 'price', 'label': 'Ціна (грн)', 'type': 'number', 'required': True, 'step': '0.01', 'min': '0.01'}
+    # 1. ЗАВАНТАЖЕННЯ КАТЕГОРІЙ
+    category_data = db.execute_query("SELECT category_id, category_name FROM menu_categories ORDER BY category_name")
+    category_options = [
+        {'value': c['category_id'], 'label': c['category_name']} 
+        for c in category_data
     ]
     
-    return render_template('form.html',
-        title='➕ Додати страву',
-        fields=fields,
-        back_url='menu_list'
-    )
+    # 2. ОНОВЛЕННЯ СТРУКТУРИ ПОЛІВ ФОРМИ
+    fields_structure = [
+        {'name': 'menu_item_name', 'label': 'Назва страви', 'type': 'text', 'required': True},
+        {'name': 'category_id', 'label': 'Категорія', 'type': 'select', 'required': True, 'options': category_options}, # ЗМІНА
+        {'name': 'menu_item_description', 'label': 'Опис', 'type': 'textarea', 'required': True},
+        {'name': 'price', 'label': 'Ціна (грн)', 'type': 'number', 'required': True, 'step': '0.01', 'min': '0'},
+    ]
+
+    if request.method == 'POST':
+        # ... (Валідація та отримання даних)
+        name = request.form['menu_item_name']
+        category_id = request.form['category_id'] # ЗМІНА: тепер ID
+        description = request.form['menu_item_description']
+        price = request.form['price']
+        
+        # ... (Валідація)
+
+        # 3. ОНОВЛЕННЯ INSERT-ЗАПИТУ
+        insert_query = """
+            INSERT INTO menu_items (menu_item_name, category_id, menu_item_description, price) 
+            VALUES (%s, %s, %s, %s)
+        """
+        try:
+            db.execute(insert_query, (name, category_id, description, price), fetch=False)
+            flash('Страву успішно додано!', 'success')
+            return redirect(url_for('menu_list'))
+        except Exception as e:
+            # ... (Обробка помилки)
+            # ...
+            return render_template('form.html', title='➕ Додати страву', fields=fields_structure, back_url='menu_list')
+    
+    return render_template('form.html', title='➕ Додати страву', fields=fields_structure, back_url='menu_list')
 
 
 @app.route('/menu/edit/<int:menu_item_id>', methods=['GET', 'POST'])
 def menu_edit(menu_item_id):
+    """Редагування страви."""
+    
+    # 1. ЗАВАНТАЖЕННЯ КАТЕГОРІЙ
+    category_data = db.execute_query("SELECT category_id, category_name FROM menu_categories ORDER BY category_name")
+    category_options = [
+        {'value': c['category_id'], 'label': c['category_name']} 
+        for c in category_data
+    ]
+
+    # 2. ОНОВЛЕННЯ SELECT-ЗАПИТУ
+    menu_item = db.execute_one(
+        "SELECT * FROM menu_items WHERE menu_item_id = %s", 
+        (menu_item_id,)
+    )
+    if not menu_item:
+        flash("Страву не знайдено.", "error")
+        return redirect(url_for('menu_list'))
+
+    # 3. ОНОВЛЕННЯ СТРУКТУРИ ПОЛІВ ФОРМИ
+    fields_structure = [
+        {'name': 'menu_item_name', 'label': 'Назва страви', 'type': 'text', 'required': True, 'value': menu_item['menu_item_name']},
+        {'name': 'category_id', 'label': 'Категорія', 'type': 'select', 'required': True, 
+         'options': category_options, 'value': menu_item['category_id']}, # ЗМІНА
+        {'name': 'menu_item_description', 'label': 'Опис', 'type': 'textarea', 'required': True, 'value': menu_item['menu_item_description']},
+        {'name': 'price', 'label': 'Ціна (грн)', 'type': 'number', 'required': True, 'step': '0.01', 'min': '0', 'value': menu_item['price']},
+    ]
+
     if request.method == 'POST':
+        # ... (Валідація та отримання даних)
+        name = request.form['menu_item_name']
+        category_id = request.form['category_id'] # ЗМІНА: тепер ID
+        description = request.form['menu_item_description']
+        price = request.form['price']
+        
+        # ... (Валідація)
+
+        # 4. ОНОВЛЕННЯ UPDATE-ЗАПИТУ
+        update_query = """
+            UPDATE menu_items SET menu_item_name=%s, category_id=%s, menu_item_description=%s, price=%s
+            WHERE menu_item_id = %s
+        """
         try:
-            name = request.form['name']
-            category = request.form['category']
-            description = request.form['description']
-            price = float(request.form['price'])
-            
-            query = """
-                UPDATE menu_items 
-                SET menu_item_name = %s, category = %s, 
-                    menu_item_description = %s, price = %s
-                WHERE menu_item_id = %s
-            """
-            db.execute_query(query, (name, category, description, price, menu_item_id), fetch=False)
-            flash(f'Страву "{name}" оновлено!', 'success')
+            db.execute(update_query, (name, category_id, description, price, menu_item_id), fetch=False)
+            flash('Дані страви успішно оновлено!', 'success')
             return redirect(url_for('menu_list'))
         except Exception as e:
-            flash(f'Помилка: {str(e)}', 'error')
-    
-    # GET - отримати дані страви
-    item = db.execute_one("SELECT * FROM menu_items WHERE menu_item_id = %s", (menu_item_id,))
-    
-    if not item:
-        flash('Страву не знайдено', 'error')
-        return redirect(url_for('menu_list'))
-    
-    fields = [
-        {'name': 'name', 'label': 'Назва страви', 'type': 'text', 'required': True, 
-         'value': item['menu_item_name']},
-        {'name': 'category', 'label': 'Категорія', 'type': 'select', 'required': True,
-         'value': item['category'],
-         'options': [{'value': c, 'label': c} for c in ['Супи', 'Салати', 'Гарячі страви', 'Паста', 'Десерти', 'Напої', 'Алкоголь']]},
-        {'name': 'description', 'label': 'Опис', 'type': 'textarea', 'required': False,
-         'value': item['menu_item_description']},
-        {'name': 'price', 'label': 'Ціна (грн)', 'type': 'number', 'required': True, 
-         'step': '0.01', 'min': '0.01', 'value': item['price']}
-    ]
-    
-    return render_template('form.html',
-        title='✏️ Редагувати страву',
-        fields=fields,
-        back_url='menu_list'
-    )
+            # ... (Обробка помилки)
+            # ...
+            return render_template('form.html', title=f"✏️ Редагувати страву #{menu_item_id}", fields=fields_structure, back_url='menu_list')
+
+    return render_template('form.html', title=f"✏️ Редагувати страву #{menu_item_id}", fields=fields_structure, back_url='menu_list')
 
 
 @app.route('/menu/delete/<int:menu_item_id>')
@@ -197,20 +255,41 @@ def customers_list():
 def customers_add():
     if request.method == 'POST':
         try:
+            first_name = request.form['first_name']
+            last_name = request.form['last_name']
+            phone = request.form['phone']
+            email = request.form['email']
+            
+            # --- ВАЛІДАЦІЯ (ДОДАНО) ---
+            if not validate_name(first_name):
+                flash("Помилка: Ім'я має містити лише літери, пробіли або дефіси. Цифри заборонені.", 'error')
+                return redirect(url_for('customers_add'))
+            if not validate_name(last_name):
+                flash("Помилка: Прізвище має містити лише літери, пробіли або дефіси. Цифри заборонені.", 'error')
+                return redirect(url_for('customers_add'))
+            if not validate_phone(phone):
+                flash("Помилка: Телефон містить недійсні символи. Дозволені: цифри, пробіли, +, -, (),", 'error')
+                return redirect(url_for('customers_add'))
+            if not validate_email(email):
+                flash("Помилка: Email має невірний формат (приклад: user@domain.com).", 'error')
+                return redirect(url_for('customers_add'))
+            # --- КІНЕЦЬ ВАЛІДАЦІЇ ---
+            
             query = """
                 INSERT INTO customers (first_name, last_name, phone, email)
                 VALUES (%s, %s, %s, %s)
             """
             db.execute_query(query, (
-                request.form['first_name'],
-                request.form['last_name'],
-                request.form['phone'],
-                request.form['email']
+                first_name,
+                last_name,
+                phone,
+                email
             ), fetch=False)
             flash('Клієнта додано!', 'success')
             return redirect(url_for('customers_list'))
         except Exception as e:
             flash(f'Помилка: {str(e)}', 'error')
+            return redirect(url_for('customers_add')) # Повертаємо на форму у разі помилки
     
     fields = [
         {'name': 'first_name', 'label': "Ім'я", 'type': 'text', 'required': True},
@@ -244,57 +323,76 @@ def customers_delete(customer_id):
 
 @app.route('/employees')
 def employees_list():
-    employees = db.execute_query("""
-        SELECT employee_id, first_name, last_name, position, phone, email
-        FROM employees ORDER BY position, last_name
-    """)
+    """Список працівників."""
+    query = """
+    SELECT 
+        e.employee_id,
+        e.first_name,
+        e.last_name,
+        p.position_name AS position,
+        e.phone,
+        e.email,
+        e.hire_date
+        FROM employees e
+        JOIN positions p ON e.position_id = p.position_id
+    """
+    employees = db.execute_query(query)
     
-    return render_template('list.html',
-        title='👔 Працівники',
+    return render_template(
+        'list.html',
+        title='🧑‍💼 Персонал',
         items=employees,
-        columns=['ID', "Ім'я", 'Прізвище', 'Посада', 'Телефон', 'Email'],
-        fields=['employee_id', 'first_name', 'last_name', 'position', 'phone', 'email'],
-        id_field='employee_id',
-        id_param='employee_id',
+        columns=['ID', "Ім'я", 'Прізвище', 'Посада', 'Телефон', 'Email', 'Дата найму'],
+        fields=['employee_id', 'first_name', 'last_name', 'position', 'phone', 'email', 'hire_date'],
         add_url='employees_add',
-        delete_url='employees_delete'
+        delete_url='employees_delete',
+        id_field='employee_id',
+        id_param='employee_id'
     )
 
 
 @app.route('/employees/add', methods=['GET', 'POST'])
 def employees_add():
-    if request.method == 'POST':
-        try:
-            query = """
-                INSERT INTO employees (first_name, last_name, position, phone, email)
-                VALUES (%s, %s, %s, %s, %s)
-            """
-            db.execute_query(query, (
-                request.form['first_name'],
-                request.form['last_name'],
-                request.form['position'],
-                request.form['phone'],
-                request.form['email']
-            ), fetch=False)
-            flash('Працівника додано!', 'success')
-            return redirect(url_for('employees_list'))
-        except Exception as e:
-            flash(f'Помилка: {str(e)}', 'error')
+    """Додавання нового працівника."""
     
-    fields = [
-        {'name': 'first_name', 'label': "Ім'я", 'type': 'text', 'required': True},
-        {'name': 'last_name', 'label': 'Прізвище', 'type': 'text', 'required': True},
-        {'name': 'position', 'label': 'Посада', 'type': 'select', 'required': True,
-         'options': [{'value': p, 'label': p} for p in ['Офіціант', 'Кухар', 'Адміністратор', 'Бармен']]},
-        {'name': 'phone', 'label': 'Телефон', 'type': 'text', 'required': True},
-        {'name': 'email', 'label': 'Email', 'type': 'text', 'required': True}
+    position_data = db.execute_query("SELECT position_id, position_name FROM positions ORDER BY position_name")
+    
+    position_options = [
+        {'value': p['position_id'], 'label': p['position_name']} 
+        for p in position_data
     ]
     
-    return render_template('form.html',
-        title='➕ Додати працівника',
-        fields=fields,
-        back_url='employees_list'
-    )
+    fields_structure = [
+        {'name': 'first_name', 'label': "Ім'я", 'type': 'text', 'required': True},
+        {'name': 'last_name', 'label': 'Прізвище', 'type': 'text', 'required': True},
+        {'name': 'position_id', 'label': 'Посада', 'type': 'select', 'required': True, 'options': position_options}, 
+        {'name': 'phone', 'label': 'Телефон', 'type': 'text', 'required': True, 'placeholder': '+380...'},
+        {'name': 'email', 'label': 'Email', 'type': 'text', 'required': True},
+    ]
+
+    if request.method == 'POST':
+        first_name = request.form['first_name']
+        last_name = request.form['last_name']
+        position_id = request.form['position_id'] 
+        phone = request.form['phone']
+        email = request.form['email']
+
+        insert_query = """
+            INSERT INTO employees (first_name, last_name, position_id, phone, email) 
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        try:
+            db.execute(insert_query, (first_name, last_name, position_id, phone, email), fetch=False)
+            flash('Працівника успішно додано!', 'success')
+            return redirect(url_for('employees_list'))
+        except Exception as e:
+            flash(f"Помилка бази даних: {e}", 'error')
+            # Повернення форми з помилкою
+            for field in fields_structure:
+                field['value'] = request.form.get(field['name'])
+            return render_template('form.html', title='➕ Додати працівника', fields=fields_structure, back_url='employees_list')
+
+    return render_template('form.html', title='➕ Додати працівника', fields=fields_structure, back_url='employees_list')
 
 
 @app.route('/employees/delete/<int:employee_id>')
@@ -344,8 +442,9 @@ def orders_add():
             """
             result = db.execute_one(query, (customer_id, employee_id, table_id))
             
-            flash(f'Замовлення #{result["order_id"]} створено!', 'success')
-            return redirect(url_for('orders_list'))
+            # ОНОВЛЕНО: Перенаправлення на сторінку деталей для додавання страв
+            flash(f'Замовлення #{result["order_id"]} створено! Тепер додайте страви.', 'success')
+            return redirect(url_for('orders_details', order_id=result['order_id']))
         except Exception as e:
             flash(f'Помилка: {str(e)}', 'error')
             return redirect(url_for('orders_add'))
@@ -353,8 +452,33 @@ def orders_add():
     # GET - форма створення
     try:
         customers = db.execute_query("SELECT customer_id, first_name, last_name FROM customers ORDER BY last_name")
-        employees = db.execute_query("SELECT employee_id, first_name, last_name FROM employees WHERE position = 'Офіціант' ORDER BY last_name")
-        tables = db.execute_query("SELECT table_id, seats, place FROM restaurant_tables WHERE is_active = TRUE ORDER BY place, seats")
+        employees = db.execute_query("""
+            SELECT 
+                e.employee_id, 
+                e.first_name, 
+                e.last_name 
+            FROM 
+                employees e
+            INNER JOIN 
+                positions p ON e.position_id = p.position_id
+            WHERE 
+                p.position_name = 'Офіціант' 
+            ORDER BY 
+                e.last_name
+        """)
+        
+        # ОНОВЛЕНО: Запит для вибору лише вільних столів
+        tables = db.execute_query("""
+            SELECT table_id, seats, place 
+            FROM restaurant_tables 
+            WHERE is_active = TRUE 
+            AND table_id NOT IN (
+                SELECT table_id 
+                FROM orders 
+                WHERE order_status IN ('NEW', 'PREPARING', 'READY')
+            )
+            ORDER BY place, seats
+        """)
         
         # Перевірка чи є дані
         if not customers:
@@ -366,7 +490,7 @@ def orders_add():
             return redirect(url_for('employees_add'))
         
         if not tables:
-            flash('В базі немає активних столів!', 'error')
+            flash('Усі столи зайняті або в базі немає активних столів!', 'error')
             return redirect(url_for('index'))
         
         # Створюємо опції для select
@@ -389,6 +513,40 @@ def orders_add():
         flash(f'Помилка завантаження даних: {str(e)}', 'error')
         return redirect(url_for('index'))
 
+@app.route('/orders/add_item/<int:order_id>', methods=['POST'])
+def orders_add_item(order_id):
+    """ДОДАНО: Обробка POST-запиту для додавання страви до замовлення."""
+    try:
+        menu_item_id = int(request.form['menu_item_id'])
+        quantity = int(request.form['quantity'])
+        
+        if quantity <= 0:
+            flash("Кількість має бути більше нуля.", "error")
+            return redirect(url_for('orders_details', order_id=order_id))
+
+        # Отримати ціну страви (якщо в базі ціна могла змінитися, беремо актуальну)
+        item_price = db.execute_one("SELECT menu_item_name, price FROM menu_items WHERE menu_item_id = %s", (menu_item_id,))
+        if not item_price:
+            flash("Вибрана страва не знайдена.", "error")
+            return redirect(url_for('orders_details', order_id=order_id))
+            
+        unit_price = item_price['price']
+
+        # Додати позицію до замовлення
+        query = """
+            INSERT INTO order_items (order_id, menu_item_id, quantity, unit_price)
+            VALUES (%s, %s, %s, %s)
+        """
+        db.execute_query(query, (order_id, menu_item_id, quantity, unit_price), fetch=False)
+        
+        flash(f'Страву "{item_price["menu_item_name"]}" у кількості {quantity} додано до замовлення #{order_id}!', 'success')
+        
+    except ValueError:
+        flash("Некоректні дані: ID страви або кількість.", "error")
+    except Exception as e:
+        flash(f"Помилка додавання позиції: {str(e)}", "error")
+        
+    return redirect(url_for('orders_details', order_id=order_id))
 
 @app.route('/orders/delete/<int:order_id>')
 def orders_delete(order_id):
@@ -402,6 +560,70 @@ def orders_delete(order_id):
     
     return redirect(url_for('orders_list'))
 
+@app.route('/orders/update_status/<int:order_id>', methods=['POST'])
+def update_order_status(order_id):
+    """Обробка POST-запиту для зміни статусу замовлення."""
+    new_status = request.form.get('new_status')
+
+    back_url = request.referrer if request.referrer else url_for('orders_list')
+    
+    if not new_status:
+        flash("Не вказано новий статус.", "error")
+        return redirect(back_url)
+
+    valid_statuses = ['NEW', 'PREPARING', 'READY', 'PAID', 'CANCELLED']
+    if new_status not in valid_statuses:
+        flash(f"Невірний статус: {new_status}", "error")
+        return redirect(back_url)
+
+    try:
+        query = "SELECT * FROM update_order_status(%s, %s)"
+        result = db.execute_query(query, (order_id, new_status), fetch=True)
+        
+        if result and result[0]['old_status'] != new_status:
+            flash(f"Статус замовлення №{order_id} успішно змінено з **{result[0]['old_status']}** на **{new_status}**.", "success")
+        elif result:
+             flash(f"Статус замовлення №{order_id} вже був **{new_status}**.", "info")
+        else:
+             flash(f"Помилка: Замовлення №{order_id} не знайдено або не змінено.", "error")
+
+    except Exception as e:
+        flash(f"Помилка зміни статусу: {e!s}", "error")
+
+    return redirect(back_url)
+
+
+@app.route('/orders/<int:order_id>')
+def orders_details(order_id):
+    """Відображення деталей одного замовлення."""
+    order_query = "SELECT * FROM view_orders_full WHERE order_id = %s"
+    items_query = """
+        SELECT oi.order_item_id, mi.menu_item_name, oi.quantity, oi.unit_price, (oi.quantity * oi.unit_price) as total_item_price
+        FROM order_items oi
+        JOIN menu_items mi ON oi.menu_item_id = mi.menu_item_id
+        WHERE oi.order_id = %s
+    """
+    
+    order = db.execute_one(order_query, (order_id,))
+    items = db.execute_query(items_query, (order_id,))
+    
+    if not order:
+        flash(f"Замовлення №{order_id} не знайдено.", "error")
+        return redirect(url_for('orders_list'))
+
+    menu_items = db.execute_query("SELECT menu_item_id, menu_item_name, price FROM menu_items ORDER BY menu_item_name")
+    
+    # Визначення всіх можливих статусів
+    statuses = ['NEW', 'PREPARING', 'READY', 'PAID', 'CANCELLED']
+        
+    return render_template(
+        'order_details.html',
+        order=order,
+        items=items,
+        statuses=statuses,
+        menu_items=menu_items, # Передаємо список страв
+        title=f"Деталі замовлення №{order_id}"
+    )
 
 # ============================================================
 # СТАТИСТИКА

@@ -42,7 +42,7 @@
     </div>
     
     <div class="stat-card highlight">
-        <div class="stat-icon">🔥</div>
+        <div class="stat-icon">⏳</div>
         <div class="stat-content">
             <h3>{{ stats.active_orders }}</h3>
             <p>Активних замовлень</p>
@@ -61,7 +61,7 @@
 
 <div class="section">
     <div class="section-header">
-        <h2>📝 Останні замовлення</h2>
+        <h2>Останні замовлення</h2>
         <a href="{{ url_for('orders_list') }}" class="btn btn-secondary">Всі замовлення</a>
     </div>
     
@@ -90,6 +90,10 @@
                     <td>№{{ order.table_id }} ({{ order.table_location }})</td>
                     <td><span class="badge badge-{{ order.order_status|lower }}">{{ order.order_status }}</span></td>
                     <td>{{ "%.2f"|format(order.total_amount) }} грн</td>
+                    <td class="actions">
+                        <a href="{{ url_for('orders_details', order_id=order.order_id) }}" 
+                           class="btn btn-small btn-info">👁️</a>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>

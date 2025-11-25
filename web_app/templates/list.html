@@ -18,9 +18,17 @@
                 {% for col in columns %}
                 <th>{{ col }}</th>
                 {% endfor %}
+                
+                {# ЗМІНЕНО: Перевірка title на '📝 Замовлення' для узгодження з app.py #}
+                {% if title == '📝 Замовлення' %} 
+                <th>Статус</th>
+                <th>Дії</th> {# ДОДАНО: Колонка Дії для Замовлень #}
+                {% else %}
                 {% if edit_url or delete_url or details_url %}
                 <th>Дії</th>
                 {% endif %}
+                {% endif %}
+                
             </tr>
         </thead>
         <tbody>
@@ -40,7 +48,39 @@
                 </td>
                 {% endfor %}
                 
-                {% if edit_url or delete_url or details_url %}
+                {# ЗМІНЕНО: Тепер для Замовлень є окрема колонка для Статусу та окрема для Дій #}
+                {% if title == '📝 Замовлення' %}
+                
+                {# Колонка Статус #}
+                <td>
+                    <form method="POST" action="{{ url_for('update_order_status', order_id=item.order_id) }}" class="form-inline">
+                        <select name="new_status" 
+                                onchange="this.form.submit()" 
+                                class="status-select status-select-{{ item.order_status|lower }}">
+                            
+                            {% set all_statuses = ['NEW', 'PREPARING', 'READY', 'PAID', 'CANCELLED'] %}
+                            {% for status in all_statuses %}
+                                <option value="{{ status }}" 
+                                        {% if item.order_status == status %}selected{% endif %}>
+                                    {{ status }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <noscript><button type="submit" class="btn btn-small">ОК</button></noscript>
+                    </form>
+                </td>
+                
+                {# Колонка Дії (Details + Delete) #}
+                <td class="actions">
+                    <a href="{{ url_for('orders_details', order_id=item.order_id) }}" 
+                       class="btn btn-small btn-info">👁️</a>
+                       
+                    <a href="{{ url_for('orders_delete', order_id=item.order_id) }}" 
+                       class="btn btn-small btn-delete"
+                       onclick="return confirm('Підтвердіть видалення')">🗑️</a>
+                </td>
+                
+                {% elif edit_url or delete_url or details_url %}
                 <td class="actions">
                     {% if details_url %}
                     <a href="{{ url_for(details_url, **{id_param: item[id_field]}) }}" 

@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1>{{ title }}</h1>
+    <a href="{{ url_for('orders_list') }}" class="btn btn-secondary">← До списку замовлень</a>
+</div>
+
+{% if order %}
+<div class="card-container">
+    <div class="card card-details">
+        <h2>Інформація про замовлення</h2>
+        <div class="details-grid">
+            
+            <div><strong>ID Замовлення:</strong> {{ order.order_id }}</div>
+            <div><strong>Дата і час:</strong> {{ order.order_time.strftime('%d.%m.%Y %H:%M') }}</div>
+            <div><strong>Загальна сума:</strong> {{ "%.2f"|format(order.total_amount) }} грн</div>
+            
+            <div class="full-row">
+                <strong>Поточний Статус:</strong> 
+                <span class="badge badge-{{ order.order_status|lower }}">{{ order.order_status }}</span>
+            </div>
+            
+            <div class="full-row">
+                <form method="POST" action="{{ url_for('update_order_status', order_id=order.order_id) }}" class="form-inline">
+                    <label for="new_status">Змінити статус:</label>
+                    <select id="new_status" name="new_status" class="status-select status-select-{{ order.order_status|lower }}">
+                        {% for status in statuses %}
+                        <option value="{{ status }}" {% if status == order.order_status %}selected{% endif %}>{{ status }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="submit" class="btn btn-small btn-status">Оновити</button>
+                </form>
+            </div>
+            
+        </div>
+    </div>
+
+    <div class="card card-details">
+        <h2>Деталі обслуговування</h2>
+        <div class="details-grid">
+            <div><strong>Клієнт:</strong> {{ order.customer_name }}</div>
+            <div><strong>Контакт:</strong> {{ order.customer_phone }}</div>
+            <div><strong>Офіціант:</strong> {{ order.employee_name }} ({{ order.employee_position }})</div>
+            <div><strong>Стіл:</strong> №{{ order.table_id }} ({{ order.table_location }})</div>
+        </div>
+    </div>
+</div>
+
+{# НОВА СЕКЦІЯ: ДОДАВАННЯ ПОЗИЦІЇ ДО ЗАМОВЛЕННЯ #}
+{% if order.order_status in ['NEW', 'PREPARING'] %}
+<div class="section card-container" style="margin-top: 20px;">
+    <div class="card">
+        <h2>➕ Додати позицію</h2>
+        <form method="POST" action="{{ url_for('orders_add_item', order_id=order.order_id) }}" class="form-inline form-add-item">
+            <div class="form-group">
+                <label for="menu_item_id">Страва:</label>
+                <select id="menu_item_id" name="menu_item_id" required>
+                    <option value="">Оберіть страву...</option>
+                    {% for item in menu_items %}
+                    <option value="{{ item.menu_item_id }}">{{ item.menu_item_name }} ({{ "%.2f"|format(item.price) }} грн)</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="quantity">Кількість:</label>
+                <input type="number" id="quantity" name="quantity" value="1" min="1" required style="width: 80px;">
+            </div>
+            <button type="submit" class="btn btn-primary">Додати</button>
+        </form>
+    </div>
+</div>
+{% endif %}
+{# КІНЕЦЬ НОВОЇ СЕКЦІЇ #}
+
+<h2>Позиції замовлення</h2>
+{% if items %}
+<div class="table-responsive">
+    <table class="data-table">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Страва</th>
+                <th>Кількість</th>
+                <th>Ціна за одиницю</th>
+                <th>Сума</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in items %}
+            <tr>
+                <td>{{ item.order_item_id }}</td>
+                <td>{{ item.menu_item_name }}</td>
+                <td>{{ item.quantity }}</td>
+                <td>{{ "%.2f"|format(item.unit_price) }} грн</td>
+                <td>{{ "%.2f"|format(item.total_item_price) }} грн</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% else %}
+<p>У цьому замовленні поки немає жодної позиції.</p>
+{% endif %}
+
+{% else %}
+<div class="alert alert-error">Замовлення не знайдено.</div>
+{% endif %}
+
+{% endblock %}

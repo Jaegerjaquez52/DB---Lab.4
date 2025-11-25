@@ -10,7 +10,7 @@ SELECT
     c.email AS customer_email,
     e.employee_id,
     e.first_name || ' ' || e.last_name AS employee_name,
-    e.position AS employee_position,
+    p.position_name AS employee_position,
     rt.table_id,
     rt.seats,
     rt.place AS table_location,
@@ -23,15 +23,16 @@ SELECT
 FROM orders o
 INNER JOIN customers c ON o.customer_id = c.customer_id
 INNER JOIN employees e ON o.employee_id = e.employee_id
+INNER JOIN positions p ON e.position_id = p.position_id 
 INNER JOIN restaurant_tables rt ON o.table_id = rt.table_id;
 
 
--- Показує продуктивність кожного працівника
+-- Показує продуктивність кожного працівника (ТІЛЬКИ ОФІЦІАНТИ)
 CREATE OR REPLACE VIEW view_employee_statistics AS
 SELECT 
     e.employee_id,
     e.first_name || ' ' || e.last_name AS employee_name,
-    e.position,
+    p.position_name AS position,
     e.phone,
     e.email,
     COUNT(DISTINCT o.order_id) AS total_orders,
@@ -48,9 +49,10 @@ SELECT
     MIN(o.order_time) AS first_order_date,
     MAX(o.order_time) AS last_order_date
 FROM employees e
+INNER JOIN positions p ON e.position_id = p.position_id
 LEFT JOIN orders o ON e.employee_id = o.employee_id AND o.order_status != 'CANCELLED'
-GROUP BY e.employee_id, e.first_name, e.last_name, e.position, e.phone, e.email;
-    
+WHERE p.position_name = 'Офіціант' 
+GROUP BY e.employee_id, e.first_name, e.last_name, p.position_name, e.phone, e.email;
 
 
 -- Показує найчастіше замовлювані страви
@@ -58,15 +60,14 @@ CREATE OR REPLACE VIEW view_popular_dishes AS
 SELECT 
     mi.menu_item_id,
     mi.menu_item_name,
-    mi.category,
-    mi.price,
-    COUNT(DISTINCT oi.order_id) AS times_ordered,
-    SUM(oi.quantity) AS total_quantity,
-    SUM(oi.quantity * oi.unit_price) AS total_revenue,
-    AVG(oi.quantity) AS avg_quantity_per_order
+    mc.category_name AS category, -- ЗМІНА: беремо з нової таблиці
+    COUNT(oi.order_item_id) AS times_ordered,
+    COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_revenue
 FROM menu_items mi
+INNER JOIN menu_categories mc ON mi.category_id = mc.category_id -- НОВЕ ПРИЄДНАННЯ
 INNER JOIN order_items oi ON mi.menu_item_id = oi.menu_item_id
 INNER JOIN orders o ON oi.order_id = o.order_id
 WHERE o.order_status != 'CANCELLED'
-GROUP BY mi.menu_item_id, mi.menu_item_name, mi.category, mi.price
-ORDER BY times_ordered DESC, total_revenue DESC;
+GROUP BY mi.menu_item_id, mi.menu_item_name, mc.category_name
+ORDER BY times_ordered DESC, total_revenue DESC
+LIMIT 10;

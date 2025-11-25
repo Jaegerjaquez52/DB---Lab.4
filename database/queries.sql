@@ -21,7 +21,7 @@ SELECT
     o.order_id,
     c.first_name || ' ' || c.last_name AS customer_name,
     e.first_name || ' ' || e.last_name AS employee_name,
-    e.position,
+    p.position_name, 
     rt.table_id,
     rt.place,
     o.order_time,
@@ -30,6 +30,7 @@ FROM orders o
 INNER JOIN customers c ON o.customer_id = c.customer_id
 INNER JOIN employees e ON o.employee_id = e.employee_id
 INNER JOIN restaurant_tables rt ON o.table_id = rt.table_id
+INNER JOIN positions p ON e.position_id = p.position_id 
 ORDER BY o.order_time DESC;
 
 -- Підрахувати кількість замовлень кожного клієнта
@@ -45,13 +46,14 @@ ORDER BY total_orders DESC;
 
 -- Статистика по категоріях меню
 SELECT 
-    category,
-    COUNT(*) AS items_count,
-    AVG(price) AS avg_price,
-    MIN(price) AS min_price,
-    MAX(price) AS max_price
-FROM menu_items
-GROUP BY category
+    mc.category_name AS category,
+    COUNT(mi.menu_item_id) AS items_count, 
+    AVG(mi.price) AS avg_price,
+    MIN(mi.price) AS min_price,
+    MAX(mi.price) AS max_price
+FROM menu_categories mc 
+INNER JOIN menu_items mi ON mc.category_id = mi.category_id -- ПРИЄДНАННЯ
+GROUP BY mc.category_name
 ORDER BY avg_price DESC;
 
 -- Загальна сума кожного замовлення

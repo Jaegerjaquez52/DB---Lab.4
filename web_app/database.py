@@ -27,12 +27,12 @@ class DatabaseConnection:
                 port=self.conn_params['port'],
                 autocommit=False,
                 options='-c client_encoding=UTF8',
-                row_factory=dict_row,  # одразу отримаємо dict-рядки
+                row_factory=dict_row,  
             )
             print("Успішне підключення до бази даних")
             return True
         except Exception as e:
-            # тут важливо просто надрукувати текст помилки, не декодуючи байти
+        
             print(f"Помилка підключення: {e!s}")
             self.conn = None
             return False
@@ -46,7 +46,7 @@ class DatabaseConnection:
     def _ensure_connection(self) -> bool:
         """Перевірити та відновити підключення якщо потрібно"""
         if self.conn is None or self.conn.closed:
-            print("⚠️ З'єднання втрачено, відновлюємо...")
+            print("З'єднання втрачено, відновлюємо...")
             self.connect()
         return self.conn is not None and not self.conn.closed
 

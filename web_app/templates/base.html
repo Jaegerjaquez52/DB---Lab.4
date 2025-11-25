@@ -10,26 +10,26 @@
     <nav class="navbar">
         <div class="nav-container">
             <div class="nav-brand">
-                <h1>🍽️ Ресторан</h1>
+                <h1>Ресторан</h1>
             </div>
             <ul class="nav-menu">
                 <li><a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>
-                    📊 Головна
+                    Головна
                 </a></li>
                 <li><a href="{{ url_for('menu_list') }}" {% if request.endpoint and 'menu' in request.endpoint %}class="active"{% endif %}>
-                    📋 Меню
+                    Меню
                 </a></li>
                 <li><a href="{{ url_for('orders_list') }}" {% if request.endpoint and 'orders' in request.endpoint %}class="active"{% endif %}>
-                    📝 Замовлення
+                    Замовлення
                 </a></li>
                 <li><a href="{{ url_for('customers_list') }}" {% if request.endpoint and 'customers' in request.endpoint %}class="active"{% endif %}>
-                    👥 Клієнти
+                    Клієнти
                 </a></li>
                 <li><a href="{{ url_for('employees_list') }}" {% if request.endpoint and 'employees' in request.endpoint %}class="active"{% endif %}>
-                    👔 Персонал
+                    Персонал
                 </a></li>
                 <li><a href="{{ url_for('statistics') }}" {% if request.endpoint == 'statistics' %}class="active"{% endif %}>
-                    📈 Статистика
+                    Статистика
                 </a></li>
             </ul>
         </div>
@@ -42,7 +42,7 @@
                     {% for category, message in messages %}
                         <div class="alert alert-{{ category }}">
                             <span>{{ message }}</span>
-                            <button class="alert-close" onclick="this.parentElement.remove()">×</button>
+                            <button class="alert-close" onclick="this.parentElement.remove()">x</button>
                         </div>
                     {% endfor %}
                 </div>
@@ -53,11 +53,10 @@
     </main>
 
     <footer class="footer">
-        <p>&copy; 2025 Система управління рестораном | Лабораторна робота №4</p>
+        <p>&copy; 2025 Система управління рестораном</p>
     </footer>
 
     <script>
-        // Автоматичне закриття alerts через 5 секунд
         setTimeout(function() {
             const alerts = document.querySelectorAll('.alert');
             alerts.forEach(alert => {
