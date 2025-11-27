@@ -52,7 +52,7 @@ SELECT
     MIN(mi.price) AS min_price,
     MAX(mi.price) AS max_price
 FROM menu_categories mc 
-INNER JOIN menu_items mi ON mc.category_id = mi.category_id -- ПРИЄДНАННЯ
+INNER JOIN menu_items mi ON mc.category_id = mi.category_id 
 GROUP BY mc.category_name
 ORDER BY avg_price DESC;
 
