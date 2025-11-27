@@ -9,16 +9,6 @@ CREATE TABLE IF NOT EXISTS order_audit (
     changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Таблиця для логування змін цін
-CREATE TABLE IF NOT EXISTS price_history (
-    history_id SERIAL PRIMARY KEY,
-    menu_item_id INT,
-    old_price DECIMAL(10,2),
-    new_price DECIMAL(10,2),
-    changed_by VARCHAR(50),
-    changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 -- ТРИГЕР 1: Логування змін статусу замовлення
 CREATE OR REPLACE FUNCTION log_order_status_change()
 RETURNS TRIGGER AS $$
@@ -82,6 +72,16 @@ BEGIN
     -- Перевірка 4: Статус валідний
     IF NEW.order_status NOT IN ('NEW', 'PREPARING', 'READY', 'PAID', 'CANCELLED') THEN
         RAISE EXCEPTION 'Невірний статус замовлення: %', NEW.order_status;
+    END IF;
+
+    IF EXISTS (
+    SELECT 1 FROM orders 
+    WHERE table_id = NEW.table_id 
+    AND order_status IN ('NEW', 'PREPARING', 'READY')
+    -- Важливо: якщо це UPDATE, не блокувати саме себе
+    AND (TG_OP = 'INSERT' OR order_id != NEW.order_id) )
+    THEN
+        RAISE EXCEPTION 'Стіл % вже зайнятий активним замовленням', NEW.table_id;
     END IF;
     
     RETURN NEW;

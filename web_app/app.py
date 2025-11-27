@@ -1,6 +1,10 @@
-from flask import Flask, render_template, request, redirect, url_for, flash
+from flask import Flask, Response, render_template, request, redirect, url_for, flash, session, g 
 from database import DatabaseConnection
+from io import StringIO
 import re
+import csv
+from werkzeug.security import generate_password_hash, check_password_hash 
+from functools import wraps 
 
 # Ініціалізація Flask додатку
 app = Flask(__name__)
@@ -17,6 +21,105 @@ db = DatabaseConnection(
     port=5432
 )
 db.connect()
+
+# ============================================================
+# АУТЕНТИФІКАЦІЯ
+# ============================================================
+
+# Декоратор, який перевіряє, чи користувач увійшов
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'employee_id' not in session: # Перевіряємо за наявністю ID в сесії
+            flash('Ця сторінка вимагає авторизації.', 'warning')
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def role_required(allowed_roles):
+    def decorator(f):
+        @wraps(f)
+        def decorated_function(*args, **kwargs):
+            # Спочатку перевіряємо, чи користувач взагалі увійшов
+            if 'employee_id' not in session:
+                return redirect(url_for('login'))
+            
+            # Перевіряємо роль
+            user_role = session.get('role')
+            if user_role not in allowed_roles:
+                flash('У вас недостатньо прав для цієї дії.', 'error')
+                return redirect(request.referrer or url_for('index'))
+            
+            return f(*args, **kwargs)
+        return decorated_function
+    return decorator
+
+@app.before_request
+def load_logged_in_user():
+    """Завантажує дані працівника перед кожним запитом, якщо він увійшов."""
+    user = get_current_employee()
+    g.employee = user # Зберігаємо в об'єкті g
+    # g.employee буде None, якщо користувач не увійшов
+    
+# Допоміжна функція для отримання поточного працівника з БД
+def get_current_employee():
+    employee_id = session.get('employee_id')
+    if employee_id:
+        try:
+            employee = db.execute_one(
+                "SELECT employee_id, first_name, last_name, email, position_id FROM employees WHERE employee_id = %s", 
+                (employee_id,)
+            )
+            return employee
+        except Exception as e:
+            print(f"Помилка при отриманні даних працівника: {e}")
+            return None
+    return None
+
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    title = "Вхід до системи"
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip()
+        password = request.form.get('password', '').strip()
+        
+        try:
+            query = """
+                SELECT e.employee_id, e.first_name, e.last_name, e.password_hash, p.position_name 
+                FROM employees e
+                JOIN positions p ON e.position_id = p.position_id
+                WHERE e.email = %s
+            """
+            results = db.execute_query(query, (email,))
+            
+            user = results[0] if results else None
+            
+            if user:
+                stored_hash = user.get('password_hash')
+                
+                if stored_hash and check_password_hash(stored_hash, password):
+                    session['employee_id'] = user['employee_id']
+                    session['employee_name'] = f"{user['first_name']} {user['last_name']}"
+                    
+                    session['role'] = user['position_name'] 
+                    
+                    flash(f'Вітаємо, {user["first_name"]} ({user["position_name"]})!', 'success')
+                    return redirect(url_for('index'))
+                
+            flash('Невірний email або пароль.', 'danger')
+            
+        except Exception as e:
+            print(f"Помилка входу: {e}")
+            flash('Помилка сервера.', 'danger')
+            
+    return render_template('login.html', title=title)
+
+@app.route('/logout')
+def logout():
+    session.pop('employee_id', None)
+    session.pop('employee_name', None)
+    flash('Ви успішно вийшли.', 'info')
+    return redirect(url_for('login'))
 
 # ============================================================
 # Валідація
@@ -57,6 +160,7 @@ def validate_email(email):
 # ============================================================
 
 @app.route('/')
+@login_required
 def index():
     """Головна сторінка з загальною статистикою"""
     try:
@@ -94,29 +198,40 @@ def index():
 # ============================================================
 
 @app.route('/menu')
+@login_required
 def menu_list():
-    """Список страв у меню."""
-    query = """
+    """Список страв у меню з пошуком."""
+    search_query = request.args.get('search', '').strip()
+    
+    base_sql = """
         SELECT mi.*, mc.category_name 
         FROM menu_items mi 
         JOIN menu_categories mc ON mi.category_id = mc.category_id
     """
-    items = db.execute_query(query)
+    
+    if search_query:
+        sql = base_sql + " WHERE mi.menu_item_name ILIKE %s OR mi.menu_item_description ILIKE %s"
+        search_param = f"%{search_query}%"
+        items = db.execute_query(sql, (search_param, search_param))
+    else:
+        items = db.execute_query(base_sql)
     
     return render_template(
         'list.html',
         title='🍽️ Меню',
         items=items,
         columns=['ID', 'Назва', 'Категорія', 'Опис', 'Ціна'],
-        fields=['menu_item_id', 'menu_item_name', 'category', 'menu_item_description', 'price'],
+        fields=['menu_item_id', 'menu_item_name', 'category_name', 'menu_item_description', 'price'], # Зверніть увагу: category_name
         add_url='menu_add',
         edit_url='menu_edit',
         delete_url='menu_delete',
         id_field='menu_item_id',
-        id_param='menu_item_id'
+        id_param='menu_item_id',
+        search_query=search_query 
     )
 
 @app.route('/menu/add', methods=['GET', 'POST'])
+@role_required(['Адміністратор'])
 def menu_add():
     """Додавання нової страви."""
     
@@ -162,6 +277,7 @@ def menu_add():
 
 
 @app.route('/menu/edit/<int:menu_item_id>', methods=['GET', 'POST'])
+@role_required(['Адміністратор'])
 def menu_edit(menu_item_id):
     """Редагування страви."""
     
@@ -191,13 +307,11 @@ def menu_edit(menu_item_id):
     ]
 
     if request.method == 'POST':
-        # ... (Валідація та отримання даних)
         name = request.form['menu_item_name']
         category_id = request.form['category_id'] # ЗМІНА: тепер ID
         description = request.form['menu_item_description']
         price = request.form['price']
         
-        # ... (Валідація)
 
         # 4. ОНОВЛЕННЯ UPDATE-ЗАПИТУ
         update_query = """
@@ -209,14 +323,13 @@ def menu_edit(menu_item_id):
             flash('Дані страви успішно оновлено!', 'success')
             return redirect(url_for('menu_list'))
         except Exception as e:
-            # ... (Обробка помилки)
-            # ...
             return render_template('form.html', title=f"✏️ Редагувати страву #{menu_item_id}", fields=fields_structure, back_url='menu_list')
 
     return render_template('form.html', title=f"✏️ Редагувати страву #{menu_item_id}", fields=fields_structure, back_url='menu_list')
 
 
 @app.route('/menu/delete/<int:menu_item_id>')
+@role_required(['Адміністратор'])
 def menu_delete(menu_item_id):
     try:
         item = db.execute_one("SELECT menu_item_name FROM menu_items WHERE menu_item_id = %s", (menu_item_id,))
@@ -233,6 +346,7 @@ def menu_delete(menu_item_id):
 # ============================================================
 
 @app.route('/customers')
+@login_required
 def customers_list():
     customers = db.execute_query("""
         SELECT customer_id, first_name, last_name, phone, email
@@ -306,6 +420,7 @@ def customers_add():
 
 
 @app.route('/customers/delete/<int:customer_id>')
+@role_required(['Адміністратор'])
 def customers_delete(customer_id):
     try:
         customer = db.execute_one("SELECT first_name, last_name FROM customers WHERE customer_id = %s", (customer_id,))
@@ -322,6 +437,7 @@ def customers_delete(customer_id):
 # ============================================================
 
 @app.route('/employees')
+@login_required
 def employees_list():
     """Список працівників."""
     query = """
@@ -352,6 +468,7 @@ def employees_list():
 
 
 @app.route('/employees/add', methods=['GET', 'POST'])
+@role_required(['Адміністратор'])
 def employees_add():
     """Додавання нового працівника."""
     
@@ -396,6 +513,7 @@ def employees_add():
 
 
 @app.route('/employees/delete/<int:employee_id>')
+@role_required(['Адміністратор'])
 def employees_delete(employee_id):
     try:
         employee = db.execute_one("SELECT first_name, last_name FROM employees WHERE employee_id = %s", (employee_id,))
@@ -412,6 +530,7 @@ def employees_delete(employee_id):
 # ============================================================
 
 @app.route('/orders')
+@login_required
 def orders_list():
     orders = db.execute_query("SELECT * FROM view_orders_full ORDER BY order_time DESC")
     
@@ -630,6 +749,7 @@ def orders_details(order_id):
 # ============================================================
 
 @app.route('/statistics')
+@login_required
 def statistics():
     """Сторінка зі статистикою"""
     try:
@@ -643,6 +763,10 @@ def statistics():
             SELECT * FROM view_employee_statistics 
             ORDER BY total_revenue DESC
         """)
+
+        last_30_days = db.execute_one("""
+            SELECT * FROM view_stats_last_30_days
+        """)
         
         # Якщо немає даних
         if not popular:
@@ -652,7 +776,8 @@ def statistics():
         
         return render_template('statistics.html',
             popular_dishes=popular,
-            employee_stats=employees
+            employee_stats=employees,
+            last_30_days=last_30_days
         )
     except Exception as e:
         flash(f'Помилка завантаження статистики: {str(e)}', 'error')
@@ -663,6 +788,7 @@ def statistics():
 
 
 @app.route('/reports')
+@login_required
 def reports():
     """Сторінка звітів"""
     return redirect(url_for('statistics'))
@@ -692,6 +818,98 @@ def test_db():
         """
     except Exception as e:
         return f"<h1>Помилка: {e}</h1><a href='/'>Назад</a>"
+
+# ============================================================
+# ЗВІТ
+# ============================================================
+
+@app.route('/reports/download/revenue')
+@login_required
+@role_required(['Адміністратор'])
+def download_revenue_report():
+    employees = db.execute_query("SELECT * FROM view_employee_statistics ORDER BY total_revenue DESC")
+    
+    # Створення CSV в пам'яті
+    si = StringIO()
+    cw = csv.writer(si)
+    
+    # Заголовки
+    cw.writerow(['ID', 'Ім\'я', 'Посада', 'Кількість замовлень', 'Виручка (грн)'])
+    
+    # Дані
+    for emp in employees:
+        cw.writerow([
+            emp['employee_id'], 
+            emp['employee_name'], 
+            emp['position'], 
+            emp['total_orders'], 
+            emp['total_revenue']
+        ])
+        
+    output = si.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=employees_report.csv"}
+    )
+
+@app.route('/reports/download/dishes')
+@login_required
+@role_required(['Адміністратор'])
+def download_dishes_report():
+    """Генерація CSV файлу зі звітом про популярність страв"""
+    dishes = db.execute_query("SELECT * FROM view_popular_dishes ORDER BY times_ordered DESC")
+    
+    # Створення CSV в пам'яті
+    si = StringIO()
+    
+    # Додаємо BOM для коректного відображення кирилиці в Excel
+    si.write('\ufeff')
+    
+    cw = csv.writer(si)
+    
+    # Заголовки
+    cw.writerow(['Назва страви', 'Категорія', 'Замовлено разів', 'Загальна виручка (грн)'])
+    
+    # Дані
+    for dish in dishes:
+        cw.writerow([
+            dish['menu_item_name'], 
+            dish['category'], 
+            dish['times_ordered'], 
+            dish['total_revenue']
+        ])
+        
+    output = si.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=menu_popularity_report.csv"}
+    )
+
+# ============================================================
+# ЛОГУВАННЯ
+# ============================================================
+
+@app.route('/audit')
+@login_required
+@role_required(['Адміністратор'])
+def audit_log():
+    """Перегляд логу змін статусів замовлень"""
+    logs = db.execute_query("""
+        SELECT * FROM order_audit 
+        ORDER BY changed_at DESC 
+        LIMIT 50
+    """)
+    
+    return render_template('list.html',
+        title='🕵️ Лог операцій',
+        items=logs,
+        columns=['ID', 'Замовлення', 'Дія', 'Старий статус', 'Новий статус', 'Хто змінив', 'Час'],
+        fields=['audit_id', 'order_id', 'action', 'old_status', 'new_status', 'changed_by', 'changed_at'],
+        id_field='audit_id'
+        # Кнопок редагування/видалення тут не треба, логи не можна міняти!
+    )
 
 # ============================================================
 # ЗАПУСК ДОДАТКУ

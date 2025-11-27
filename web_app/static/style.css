@@ -1,21 +1,27 @@
 /* =========================================================================
-   Базові стилі та типографія
+   Базові стилі
    ========================================================================= */
 
 :root {
-    --primary-color: #007bff; /* Яскраво-синій */
-    --primary-dark: #0056b3;
-    --secondary-color: #6c757d; /* Сірий */
-    --success-color: #28a745; /* Зелений */
-    --danger-color: #dc3545; /* Червоний */
-    --warning-color: #ffc107; /* Жовтий */
-    --info-color: #17a2b8; /* Блакитний */
+    --primary-color: #700186; 
+    --primary-dark: #840aca;
+    --secondary-color: #abb4be; 
+    --success-color: #38c159; 
+    --danger-color: #c0353e; 
+    --warning-color: #d6a921; 
+    --info-color: #17a2b8; 
     
-    --bg-light: #f8f9fa; /* Світлий фон */
-    --bg-white: #ffffff;
-    --text-dark: #212529; /* Темний текст */
-    --border-light: #dee2e6;
-    --box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+    --bg-dark: #1e1e2f; 
+    --bg-surface: #27293d; 
+    --bg-light: var(--bg-dark); 
+    --bg-white: var(--bg-surface);
+    
+    --text-light: #e0e0e0; 
+    --text-dark: var(--text-light); 
+    --border-dark: #3a3f55;
+    --border-light: var(--border-dark); 
+    
+    --box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
 * {
@@ -43,6 +49,16 @@ body {
     border-bottom: 1px solid var(--border-light);
     box-shadow: var(--box-shadow);
     padding: 0 20px;
+}
+
+.nav-auth-status {
+    margin-left: 20px; 
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
 }
 
 .nav-container {
@@ -273,7 +289,7 @@ body {
     background-color: var(--bg-white);
     box-shadow: var(--box-shadow);
     border-radius: 8px;
-    overflow: hidden; /* Щоб border-radius застосовувався до всієї таблиці */
+    overflow: hidden; 
 }
 
 .data-table th, .data-table td {
@@ -291,11 +307,11 @@ body {
 }
 
 .data-table tr:nth-child(even) {
-    background-color: #f2f2f2;
+    background-color: #2b2e45; 
 }
 
 .data-table tr:hover {
-    background-color: #e9ecef;
+    background-color: #3a3f55; 
 }
 
 .data-table .actions {
@@ -336,21 +352,21 @@ body {
 }
 
 .alert-success {
-    background-color: #d4edda;
-    color: #155724;
-    border: 1px solid #c3e6cb;
+    background-color: #38c159; 
+    color: #000;
+    border: 1px solid #38c159;
 }
 
 .alert-danger {
-    background-color: #f8d7da;
-    color: #721c24;
-    border: 1px solid #f5c6cb;
+    background-color: #e35a64; 
+    color: #000;
+    border: 1px solid #e35a64;
 }
 
 .alert-warning {
-    background-color: #fff3cd;
-    color: #856404;
-    border: 1px solid #ffeeba;
+    background-color: #ffc107; 
+    color: #000; 
+    border: 1px solid #ffc107;
 }
 
 .alert-close {
@@ -488,14 +504,14 @@ body {
     text-align: center;
     padding: 40px 20px;
     border: 1px dashed var(--border-light);
-    background-color: #f0f0f0;
+    background-color: #33364f; 
     border-radius: 8px;
     margin-top: 20px;
 }
 
 .empty-state p {
     font-size: 1.1rem;
-    color: var(--secondary-color);
+    color: var(--secondary-color); 
     margin-bottom: 15px;
 }
 
@@ -513,23 +529,23 @@ body {
 }
 
 .status-select-new {
-    border-color: #2196F3; /* Blue */
+    border-color: #2196F3; 
     color: #2196F3;
 }
 .status-select-preparing {
-    border-color: #ff9800; /* Orange */
+    border-color: #ff9800; 
     color: #ff9800;
 }
 .status-select-ready {
-    border-color: #8bc34a; /* Light Green */
+    border-color: #8bc34a;
     color: #8bc34a;
 }
 .status-select-paid {
-    border-color: #4CAF50; /* Green */
+    border-color: #4CAF50; 
     color: #4CAF50;
 }
 .status-select-cancelled {
-    border-color: #F44336; /* Red */
+    border-color: #F44336; 
     color: #F44336;
 }
 
@@ -554,6 +570,51 @@ body {
 }
 
 /* =========================================================================
+   Аутентифікація (login.html)
+   ========================================================================= */
+
+.auth-container {
+    max-width: 400px;
+    margin: 50px auto; 
+}
+
+.form-container.auth-form-container {
+    padding: 30px; 
+    background-color: var(--bg-white);
+    border-radius: 8px;
+    box-shadow: var(--box-shadow);
+}
+
+.auth-form {
+    padding: 0;
+}
+
+.btn-full-width {
+    width: 100%;
+    margin-top: 15px; 
+}
+
+.page-header.center-header {
+    justify-content: center; 
+    border-bottom: none; 
+    margin-bottom: 0; 
+    text-align: center;
+}
+
+.page-header.center-header h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: var(--primary-dark);
+    margin-bottom: 25px; 
+}
+
+.nav-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* =========================================================================
    Медіа-запити (Адаптивність)
    ========================================================================= */
 
@@ -564,11 +625,15 @@ body {
         padding-top: 10px;
     }
 
+    .nav-brand { order: 1; margin-bottom: 10px; }
+    .nav-menu { order: 2; width: 100%; }
+    .nav-auth-status { order: 3; width: 100%; text-align: center; margin: 10px 0; }
+
     .nav-menu {
         flex-direction: column;
         width: 100%;
         gap: 0;
-        padding-bottom: 10px;
+        padding-bottom: 0;
     }
 
     .nav-menu li {

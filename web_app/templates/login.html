@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="auth-container">
+    <div class="page-header center-header">
+        <h1>Вхід до системи</h1>
+    </div>
+
+    <div class="form-container auth-form-container">
+        <form method="POST" class="form auth-form"> 
+            
+            <div class="form-group">
+                <label for="email">Email (логін):</label>
+                <input type="email" id="email" name="email" required placeholder="Ваш робочий email">
+            </div>
+            
+            <div class="form-group">
+                <label for="password">Пароль:</label>
+                <input type="password" id="password" name="password" required placeholder="Ваш пароль">
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary btn-full-width">Увійти</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% endblock %}

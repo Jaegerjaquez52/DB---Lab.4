@@ -7,8 +7,61 @@
     <h1>Статистика та звіти</h1>
 </div>
 
+{# --- БЛОК 1: ЗВІТ ЗА 30 ДНІВ --- #}
+{% if last_30_days %}
 <div class="section">
-    <h2>Топ-10 популярних страв</h2>
+    <h2>📅 Звіт за останні 30 днів</h2>
+    <div class="stats-grid">
+        
+        <div class="stat-card success">
+            <div class="stat-icon">💰</div>
+            <div class="stat-content">
+                <h3>{{ "%.2f"|format(last_30_days.total_revenue) }} грн</h3>
+                <p>Чиста виручка</p>
+            </div>
+        </div>
+        
+        <div class="stat-card">
+            <div class="stat-icon">🧾</div>
+            <div class="stat-content">
+                <h3>{{ last_30_days.total_orders }}</h3>
+                <p>Всього замовлень</p>
+            </div>
+        </div>
+
+        <div class="stat-card highlight">
+            <div class="stat-icon">📈</div>
+            <div class="stat-content">
+                <h3>{{ "%.2f"|format(last_30_days.avg_order_value) }} грн</h3>
+                <p>Середній чек</p>
+            </div>
+        </div>
+
+        <div class="stat-card">
+            <div class="stat-icon">❌</div>
+            <div class="stat-content">
+                <h3>{{ last_30_days.cancelled_orders }}</h3>
+                <p>Скасовано</p>
+            </div>
+        </div>
+
+    </div>
+</div>
+{% endif %}
+
+{# --- БЛОК 2: ТОП СТРАВ --- #}
+<div class="section">
+    {# Заголовок секції з кнопкою праворуч #}
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); margin-bottom: 15px; padding-bottom: 10px;">
+        <h2 style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">Топ популярних страв</h2>
+        
+        {% if session.role == 'Адміністратор' %}
+            <a href="{{ url_for('download_dishes_report') }}" class="btn btn-info btn-small" title="Завантажити CSV">
+                📥 Звіт: Страви
+            </a>
+        {% endif %}
+    </div>
+
     {% if popular_dishes %}
     <table class="data-table">
         <thead>
@@ -30,11 +83,24 @@
             {% endfor %}
         </tbody>
     </table>
+    {% else %}
+        <p>Даних немає.</p>
     {% endif %}
 </div>
 
+{# --- БЛОК 3: СТАТИСТИКА ПРАЦІВНИКІВ --- #}
 <div class="section">
-    <h2>Статистика працівників</h2>
+    {# Заголовок секції з кнопкою праворуч #}
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-light); margin-bottom: 15px; padding-bottom: 10px;">
+        <h2 style="border-bottom: none; margin-bottom: 0; padding-bottom: 0;">Статистика працівників</h2>
+        
+        {% if session.role == 'Адміністратор' %}
+            <a href="{{ url_for('download_revenue_report') }}" class="btn btn-info btn-small" title="Завантажити CSV">
+                📥 Звіт: Працівники
+            </a>
+        {% endif %}
+    </div>
+
     {% if employee_stats %}
     <table class="data-table">
         <thead>
@@ -56,6 +122,8 @@
             {% endfor %}
         </tbody>
     </table>
+    {% else %}
+        <p>Даних немає.</p>
     {% endif %}
 </div>
 {% endblock %}

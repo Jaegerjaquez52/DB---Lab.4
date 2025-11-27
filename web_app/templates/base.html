@@ -12,26 +12,45 @@
             <div class="nav-brand">
                 <h1>Ресторан</h1>
             </div>
-            <ul class="nav-menu">
-                <li><a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>
-                    Головна
-                </a></li>
-                <li><a href="{{ url_for('menu_list') }}" {% if request.endpoint and 'menu' in request.endpoint %}class="active"{% endif %}>
-                    Меню
-                </a></li>
-                <li><a href="{{ url_for('orders_list') }}" {% if request.endpoint and 'orders' in request.endpoint %}class="active"{% endif %}>
-                    Замовлення
-                </a></li>
-                <li><a href="{{ url_for('customers_list') }}" {% if request.endpoint and 'customers' in request.endpoint %}class="active"{% endif %}>
-                    Клієнти
-                </a></li>
-                <li><a href="{{ url_for('employees_list') }}" {% if request.endpoint and 'employees' in request.endpoint %}class="active"{% endif %}>
-                    Персонал
-                </a></li>
-                <li><a href="{{ url_for('statistics') }}" {% if request.endpoint == 'statistics' %}class="active"{% endif %}>
-                    Статистика
-                </a></li>
+            
+            <ul class="nav-menu"> 
+                {% if session.get('employee_id') %}
+                    <li><a href="{{ url_for('index') }}" {% if request.endpoint == 'index' %}class="active"{% endif %}>
+                        Головна
+                    </a></li>
+                    <li><a href="{{ url_for('menu_list') }}" {% if request.endpoint and 'menu' in request.endpoint %}class="active"{% endif %}>
+                        Меню
+                    </a></li>
+                    <li><a href="{{ url_for('orders_list') }}" {% if request.endpoint and 'orders' in request.endpoint %}class="active"{% endif %}>
+                        Замовлення
+                    </a></li>
+                    <li><a href="{{ url_for('customers_list') }}" {% if request.endpoint and 'customers' in request.endpoint %}class="active"{% endif %}>
+                        Клієнти
+                    </a></li>
+                    <li><a href="{{ url_for('employees_list') }}" {% if request.endpoint and 'employees' in request.endpoint %}class="active"{% endif %}>
+                        Персонал
+                    </a></li>
+                    <li><a href="{{ url_for('statistics') }}" {% if request.endpoint == 'statistics' %}class="active"{% endif %}>
+                        Статистика
+                    </a></li>
+                {% endif %}
+                
+                {% if session.role == 'Адміністратор' %}
+                    <li><a href="{{ url_for('audit_log') }}">Логи</a></li>
+                {% endif %}
             </ul>
+
+            <div class="nav-auth-status">
+                {% if session.get('employee_id') %}
+                    <div class="nav-user">
+                        <span>{{ session.get('employee_name', 'Користувач') }}</span>
+                        <a href="{{ url_for('logout') }}" class="btn btn-danger btn-small">Вихід</a>
+                    </div>
+                {% else %}
+                    <a href="{{ url_for('login') }}" class="btn btn-primary">Вхід</a>
+                {% endif %}
+            </div>
+
         </div>
     </nav>
 

@@ -60,14 +60,19 @@ CREATE OR REPLACE VIEW view_popular_dishes AS
 SELECT 
     mi.menu_item_id,
     mi.menu_item_name,
-    mc.category_name AS category, -- ЗМІНА: беремо з нової таблиці
+    mc.category_name AS category,
     COUNT(oi.order_item_id) AS times_ordered,
     COALESCE(SUM(oi.quantity * oi.unit_price), 0) AS total_revenue
 FROM menu_items mi
-INNER JOIN menu_categories mc ON mi.category_id = mc.category_id -- НОВЕ ПРИЄДНАННЯ
-INNER JOIN order_items oi ON mi.menu_item_id = oi.menu_item_id
-INNER JOIN orders o ON oi.order_id = o.order_id
-WHERE o.order_status != 'CANCELLED'
+INNER JOIN menu_categories mc ON mi.category_id = mc.category_id 
+LEFT JOIN order_items oi ON mi.menu_item_id = oi.menu_item_id
+LEFT JOIN orders o ON oi.order_id = o.order_id AND o.order_status != 'CANCELLED'
 GROUP BY mi.menu_item_id, mi.menu_item_name, mc.category_name
-ORDER BY times_ordered DESC, total_revenue DESC
-LIMIT 10;
+ORDER BY times_ordered DESC, total_revenue DESC;
+
+-- Статистика за останні 30 днів
+CREATE OR REPLACE VIEW view_stats_last_30_days AS
+SELECT * FROM calculate_revenue(
+    NOW() - INTERVAL '30 days',
+    NOW()
+);

@@ -22,6 +22,9 @@ CREATE TABLE employees (
     hire_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+ALTER TABLE employees
+ADD COLUMN password_hash VARCHAR(300);
+
 CREATE TABLE restaurant_tables(
     table_id SERIAL PRIMARY KEY,
     seats INT NOT NULL,
@@ -59,6 +62,8 @@ CREATE TABLE order_items (
     quantity INT NOT NULL CHECK (quantity > 0),
     unit_price NUMERIC(10,2) NOT NULL
 );
+
+
 
 CREATE INDEX idx_orders_customer_id ON orders(customer_id);
 CREATE INDEX idx_orders_employee_id ON orders(employee_id);

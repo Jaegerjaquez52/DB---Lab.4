@@ -5,8 +5,32 @@
 {% block content %}
 <div class="page-header">
     <h1>{{ title }}</h1>
+    
+    {# --- ПОШУК --- #}
+    {% if title == '🍽️ Меню' %}
+        <form method="GET" class="form-inline" style="margin-left: auto; margin-right: 10px;">
+            <input type="text" name="search" placeholder="Пошук страви..." 
+                   value="{{ search_query if search_query else '' }}" 
+                   style="padding: 5px; border-radius: 4px; border: 1px solid #ccc;">
+            <button type="submit" class="btn btn-secondary btn-small">🔍</button>
+            {% if search_query %}
+                <a href="{{ request.path }}" class="btn btn-danger btn-small" title="Скинути пошук">✕</a>
+            {% endif %}
+        </form>
+    {% endif %}
+
+    {# --- ЛОГІКА КНОПКИ "ДОДАТИ" --- #}
     {% if add_url %}
-    <a href="{{ url_for(add_url) }}" class="btn btn-primary">➕ Додати</a>
+        {# Для Меню та Персоналу: Додавати може тільки Адміністратор #}
+        {% if title == '🍽️ Меню' or title == '🧑‍💼 Персонал' %}
+            {% if session.role == 'Адміністратор' %}
+                <a href="{{ url_for(add_url) }}" class="btn btn-primary">➕ Додати</a>
+            {% endif %}
+        
+        {# Для Замовлень та Клієнтів: Додавати можуть усі (офіціанти теж) #}
+        {% else %}
+            <a href="{{ url_for(add_url) }}" class="btn btn-primary">➕ Додати</a>
+        {% endif %}
     {% endif %}
 </div>
 
@@ -15,28 +39,31 @@
     <table class="data-table">
         <thead>
             <tr>
+                {# Вивід заголовків колонок #}
                 {% for col in columns %}
                 <th>{{ col }}</th>
                 {% endfor %}
                 
-                {# ЗМІНЕНО: Перевірка title на '📝 Замовлення' для узгодження з app.py #}
-                {% if title == '📝 Замовлення' %} 
-                <th>Статус</th>
-                <th>Дії</th> {# ДОДАНО: Колонка Дії для Замовлень #}
-                {% else %}
-                {% if edit_url or delete_url or details_url %}
-                <th>Дії</th>
-                {% endif %}
-                {% endif %}
+                {# --- ЗАГОЛОВКИ СПЕЦІАЛЬНИХ КОЛОНОК --- #}
                 
+                {# 1. ЗАМОВЛЕННЯ: Завжди показуємо Статус і Дії #}
+                {% if title == '📝 Замовлення' %}
+                    <th>Статус</th>
+                    <th>Дії</th>
+                {% else %}
+                    {% if session.role == 'Адміністратор' %}
+                        <th>Дії</th>
+                    {% endif %}
+                {% endif %}
             </tr>
         </thead>
         <tbody>
             {% for item in items %}
             <tr>
+                {# Вивід основних даних #}
                 {% for field in fields %}
                 <td>
-                    {% if field == 'price' or field == 'total_amount' or field == 'avg_order_value' or field == 'total_revenue' %}
+                    {% if field == 'price' or field == 'total_amount' or field == 'total_revenue' %}
                         {{ "%.2f"|format(item[field]) }} грн
                     {% elif field == 'order_status' %}
                         <span class="badge badge-{{ item[field]|lower }}">{{ item[field] }}</span>
@@ -48,56 +75,49 @@
                 </td>
                 {% endfor %}
                 
-                {# ЗМІНЕНО: Тепер для Замовлень є окрема колонка для Статусу та окрема для Дій #}
+                {# --- ВМІСТ СПЕЦІАЛЬНИХ КОЛОНОК --- #}
+                
+                {# 1. ЗАМОВЛЕННЯ #}
                 {% if title == '📝 Замовлення' %}
-                
-                {# Колонка Статус #}
-                <td>
-                    <form method="POST" action="{{ url_for('update_order_status', order_id=item.order_id) }}" class="form-inline">
-                        <select name="new_status" 
-                                onchange="this.form.submit()" 
-                                class="status-select status-select-{{ item.order_status|lower }}">
+                    <td>
+                        {# Зміна статусу доступна всім #}
+                        <form method="POST" action="{{ url_for('update_order_status', order_id=item.order_id) }}" class="form-inline">
+                            <select name="new_status" onchange="this.form.submit()" class="status-select status-select-{{ item.order_status|lower }}">
+                                {% set all_statuses = ['NEW', 'PREPARING', 'READY', 'PAID', 'CANCELLED'] %}
+                                {% for status in all_statuses %}
+                                    <option value="{{ status }}" {% if item.order_status == status %}selected{% endif %}>{{ status }}</option>
+                                {% endfor %}
+                            </select>
+                        </form>
+                    </td>
+                    <td class="actions">
+                        {# Деталі бачать усі #}
+                        <a href="{{ url_for('orders_details', order_id=item.order_id) }}" class="btn btn-small btn-info">👁️</a>
+                        
+                        {# Видаляти замовлення може ТІЛЬКИ Адміністратор #}
+                        {% if session.role == 'Адміністратор' %}
+                            <a href="{{ url_for('orders_delete', order_id=item.order_id) }}" 
+                               class="btn btn-small btn-delete"
+                               onclick="return confirm('Ви впевнені, що хочете видалити це замовлення?')">🗑️</a>
+                        {% endif %}
+                    </td>
+
+                {# 2. ІНШІ СПИСКИ (Меню, Персонал, Клієнти) #}
+                {% else %}
+                    {# Кнопки редагування/видалення бачить ТІЛЬКИ Адміністратор #}
+                    {% if session.role == 'Адміністратор' %}
+                        <td class="actions">
+                            {% if edit_url %}
+                                <a href="{{ url_for(edit_url, **{id_param: item[id_field]}) }}" class="btn btn-small btn-edit">✏️</a>
+                            {% endif %}
                             
-                            {% set all_statuses = ['NEW', 'PREPARING', 'READY', 'PAID', 'CANCELLED'] %}
-                            {% for status in all_statuses %}
-                                <option value="{{ status }}" 
-                                        {% if item.order_status == status %}selected{% endif %}>
-                                    {{ status }}
-                                </option>
-                            {% endfor %}
-                        </select>
-                        <noscript><button type="submit" class="btn btn-small">ОК</button></noscript>
-                    </form>
-                </td>
-                
-                {# Колонка Дії (Details + Delete) #}
-                <td class="actions">
-                    <a href="{{ url_for('orders_details', order_id=item.order_id) }}" 
-                       class="btn btn-small btn-info">👁️</a>
-                       
-                    <a href="{{ url_for('orders_delete', order_id=item.order_id) }}" 
-                       class="btn btn-small btn-delete"
-                       onclick="return confirm('Підтвердіть видалення')">🗑️</a>
-                </td>
-                
-                {% elif edit_url or delete_url or details_url %}
-                <td class="actions">
-                    {% if details_url %}
-                    <a href="{{ url_for(details_url, **{id_param: item[id_field]}) }}" 
-                       class="btn btn-small btn-info">👁️</a>
+                            {% if delete_url %}
+                                <a href="{{ url_for(delete_url, **{id_param: item[id_field]}) }}" 
+                                   class="btn btn-small btn-delete"
+                                   onclick="return confirm('Ви впевнені? Це незворотна дія.')">🗑️</a>
+                            {% endif %}
+                        </td>
                     {% endif %}
-                    
-                    {% if edit_url %}
-                    <a href="{{ url_for(edit_url, **{id_param: item[id_field]}) }}" 
-                       class="btn btn-small btn-edit">✏️</a>
-                    {% endif %}
-                    
-                    {% if delete_url %}
-                    <a href="{{ url_for(delete_url, **{id_param: item[id_field]}) }}" 
-                       class="btn btn-small btn-delete"
-                       onclick="return confirm('Підтвердіть видалення')">🗑️</a>
-                    {% endif %}
-                </td>
                 {% endif %}
             </tr>
             {% endfor %}
@@ -105,11 +125,19 @@
     </table>
 </div>
 <p class="table-info">Всього записів: {{ items|length }}</p>
+
 {% else %}
 <div class="empty-state">
     <p>Даних поки немає</p>
+    {# Показуємо кнопку додавання першого запису за тією ж логікою #}
     {% if add_url %}
-    <a href="{{ url_for(add_url) }}" class="btn btn-primary">Додати перший запис</a>
+        {% if title == '🍽️ Меню' or title == '🧑‍💼 Персонал' %}
+            {% if session.role == 'Адміністратор' %}
+                <a href="{{ url_for(add_url) }}" class="btn btn-primary">Додати перший запис</a>
+            {% endif %}
+        {% else %}
+            <a href="{{ url_for(add_url) }}" class="btn btn-primary">Додати перший запис</a>
+        {% endif %}
     {% endif %}
 </div>
 {% endif %}

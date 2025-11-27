@@ -121,13 +121,10 @@ $$ LANGUAGE plpgsql;
 
 
 -- Процедура 3: Розрахунок загальної виручки за період
--- Використання: 
--- Виручка за листопад 2025
--- SELECT * FROM calculate_revenue('2025-11-01', '2025-11-30');
 
 CREATE OR REPLACE FUNCTION calculate_revenue(
-    p_start_date TIMESTAMP,
-    p_end_date TIMESTAMP
+    p_start_date TIMESTAMPTZ,
+    p_end_date TIMESTAMPTZ
 ) RETURNS TABLE(
     total_orders INT,
     total_revenue DECIMAL,
