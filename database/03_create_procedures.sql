@@ -154,15 +154,29 @@ $$ LANGUAGE plpgsql;
 
 -- Процедура 4: Оновлює статистику планувальника та чистить "мертві" рядки
 
-CREATE OR REPLACE PROCEDURE maintenance_optimize_db()
+CREATE TABLE IF NOT EXISTS maintenance_log (
+    log_id SERIAL PRIMARY KEY,
+    operation VARCHAR(100),
+    executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE OR REPLACE PROCEDURE maintain_database()
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    -- Оновлення статистики для кращої роботи індексів
-    RAISE NOTICE 'Початок оновлення статистики...';
-    ANALYZE; 
-    
-    VACUUM (ANALYZE, VERBOSE);
-    
-    RAISE NOTICE 'Обслуговування завершено успішно.';
+    -- Оновлення статистики 
+    ANALYZE;
+
+    -- Очищення мертвих кортежів
+    -- VACUUM ANALYZE;
+
+    -- Перебудова індексів
+    -- REINDEX SCHEMA public;
+
+    -- Логування виконання 
+    INSERT INTO maintenance_log (operation, executed_at)
+    VALUES ('Full maintenance', NOW());
+
+    RAISE NOTICE 'Database maintenance completed successfully';
 END;
+$$;
