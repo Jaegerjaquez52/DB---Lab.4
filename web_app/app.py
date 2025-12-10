@@ -15,8 +15,8 @@ app.secret_key = '12345'
 # Підключення до бази даних
 db = DatabaseConnection(
     dbname='restaurant',
-    user='postgres',
-    password='password',
+    user='app_user',           
+    password='password', 
     host='postgres',
     port=5432
 )
@@ -908,7 +908,6 @@ def audit_log():
         columns=['ID', 'Замовлення', 'Дія', 'Старий статус', 'Новий статус', 'Хто змінив', 'Час'],
         fields=['audit_id', 'order_id', 'action', 'old_status', 'new_status', 'changed_by', 'changed_at'],
         id_field='audit_id'
-        # Кнопок редагування/видалення тут не треба, логи не можна міняти!
     )
 
 # ============================================================

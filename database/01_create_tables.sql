@@ -73,3 +73,8 @@ CREATE INDEX idx_orders_time ON orders(order_time);
 CREATE INDEX idx_order_items_order_id ON order_items(order_id);
 CREATE INDEX idx_order_items_menu_item_id ON order_items(menu_item_id);
 CREATE INDEX idx_menu_items_category ON menu_items(category_id);
+
+-- Індекс тільки для активних замовлень
+CREATE INDEX idx_orders_active 
+ON orders(order_time) 
+WHERE order_status IN ('NEW', 'PREPARING', 'READY');

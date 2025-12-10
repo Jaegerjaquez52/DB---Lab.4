@@ -1,4 +1,4 @@
--- Таблиця для аудиту (логування змін)
+-- Таблиця для аудиту для замовлень
 CREATE TABLE IF NOT EXISTS order_audit (
     audit_id SERIAL PRIMARY KEY,
     order_id INT,
@@ -13,18 +13,32 @@ CREATE TABLE IF NOT EXISTS order_audit (
 CREATE OR REPLACE FUNCTION log_order_status_change()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- Логувати тільки якщо статус змінився
-    IF OLD.order_status != NEW.order_status THEN
+    -- 1. Якщо створюється нове замовлення
+    IF (TG_OP = 'INSERT') THEN
         INSERT INTO order_audit (order_id, action, old_status, new_status, changed_by)
-        VALUES (NEW.order_id, 'UPDATE', OLD.order_status, NEW.order_status, current_user);
+        VALUES (NEW.order_id, 'CREATE', NULL, NEW.order_status, current_user);
+        RETURN NEW;
+
+    -- 2. Якщо замовлення оновлюється
+    ELSIF (TG_OP = 'UPDATE') THEN
+        -- Використовуємо IS DISTINCT FROM, щоб коректно обробляти NULL значення
+        IF OLD.order_status IS DISTINCT FROM NEW.order_status THEN
+            INSERT INTO order_audit (order_id, action, old_status, new_status, changed_by)
+            VALUES (NEW.order_id, 'UPDATE', OLD.order_status, NEW.order_status, current_user);
+        END IF;
+        RETURN NEW;
+
+    -- 3. Якщо замовлення видаляється
+    ELSIF (TG_OP = 'DELETE') THEN
+        INSERT INTO order_audit (order_id, action, old_status, changed_by)
+        VALUES (OLD.order_id, 'DELETE', OLD.order_status, current_user);
+        RETURN OLD;
     END IF;
-    
-    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
 CREATE TRIGGER trigger_order_status_change
-AFTER UPDATE ON orders
+AFTER INSERT OR UPDATE ON orders
 FOR EACH ROW
 EXECUTE FUNCTION log_order_status_change();
 
@@ -93,19 +107,17 @@ BEFORE INSERT ON orders
 FOR EACH ROW
 EXECUTE FUNCTION validate_order_before_insert();
 
-
--- ТРИГЕР 4: Логування видалення замовлень
-CREATE OR REPLACE FUNCTION log_order_deletion()
+-- ТРИГЕР 4: Оновлення кешу, коли замовлення оплачується або змінюється
+CREATE OR REPLACE FUNCTION refresh_revenue_cache()
 RETURNS TRIGGER AS $$
 BEGIN
-    INSERT INTO order_audit (order_id, action, old_status, changed_by)
-    VALUES (OLD.order_id, 'DELETE', OLD.order_status, current_user);
-    
-    RETURN OLD;
+    REFRESH MATERIALIZED VIEW mv_daily_revenue_cache;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
-CREATE TRIGGER trigger_log_order_deletion
-BEFORE DELETE ON orders
+CREATE TRIGGER trigger_refresh_revenue_cache
+AFTER UPDATE OF order_status OR INSERT ON orders
 FOR EACH ROW
-EXECUTE FUNCTION log_order_deletion();
+WHEN (NEW.order_status = 'PAID')
+EXECUTE FUNCTION refresh_revenue_cache();

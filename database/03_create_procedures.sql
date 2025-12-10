@@ -150,3 +150,19 @@ BEGIN
     WHERE o.order_time BETWEEN p_start_date AND p_end_date;
 END;
 $$ LANGUAGE plpgsql;
+
+
+-- Процедура 4: Оновлює статистику планувальника та чистить "мертві" рядки
+
+CREATE OR REPLACE PROCEDURE maintenance_optimize_db()
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    -- Оновлення статистики для кращої роботи індексів
+    RAISE NOTICE 'Початок оновлення статистики...';
+    ANALYZE; 
+    
+    VACUUM (ANALYZE, VERBOSE);
+    
+    RAISE NOTICE 'Обслуговування завершено успішно.';
+END;
