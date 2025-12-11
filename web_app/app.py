@@ -755,7 +755,7 @@ def statistics():
     try:
         # Популярні страви
         popular = db.execute_query("""
-            SELECT * FROM view_popular_dishes LIMIT 10
+            SELECT * FROM view_popular_dishes  LIMIT 10
         """)
         
         # Статистика працівників

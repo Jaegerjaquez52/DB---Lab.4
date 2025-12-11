@@ -45,7 +45,6 @@ GRANT EXECUTE ON FUNCTION calculate_revenue(TIMESTAMPTZ, TIMESTAMPTZ) TO flask_a
 -- =========================================================
 
 -- Створюємо конкретного юзера, якого пропишемо в app.py
--- ЗАМІНІТЬ 'secure_pass_2025' НА СВІЙ ПАРОЛЬ
 CREATE USER app_user WITH PASSWORD 'password';
 
 -- Призначаємо йому налаштовану роль
